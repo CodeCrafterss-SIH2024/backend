@@ -12,7 +12,8 @@
 
   const app = express();
   app.use(express.json());
-  app.use(cors({ origin: 'https://frontend-mauve-pi.vercel.app/' }));
+  // app.use(cors({ origin: 'https://frontend-mauve-pi.vercel.app/' }));
+  app.use(cors()); 
   app.use(bodyParser.json());
 
   const PORT = process.env.PORT || 5000;
