@@ -579,6 +579,7 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, default: 'pending' }, // Default role pending for verification
   otp: String,
   otpExpires: Date,
+  points: { type: Number, default: 0 },
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -692,7 +693,7 @@ app.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user._id, role: user.role, user: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id, role: user.role, user: user.username, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
     console.error('Login error:', error);
@@ -823,6 +824,100 @@ app.post('/reset-password', async (req, res) => {
     res.status(500).json({ error: 'Password reset failed' });
   }
 });
+
+
+
+
+
+
+//  for mcq...
+
+// Route to get user points by user id
+app.get('/get-points', async (req, res) => {
+  try {
+    const { email: emailString } = req.query;
+
+    // Parse the email field to extract the actual email
+    const emailObj = JSON.parse(emailString);  // Parse the email string to JSON
+    const email = emailObj.email;  // Extract the actual email
+
+    if (!email) {
+      return res.status(400).json({ message: 'Invalid request. Email missing.' });
+    }
+
+    // Find the user by email (case-insensitive)
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ points: user.points });
+  } catch (error) {
+    console.error("Error retrieving points:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
+// Route to update user points
+app.post('/update-points', async (req, res) => {
+  try {
+    console.log("Request body:", req.body);  // Log the request body
+    
+    // Parse the email field to extract the actual email
+    const { email: emailString, pointsToAdd } = req.body;
+    const emailObj = JSON.parse(emailString);  // Parse the email string to JSON
+    const email = emailObj.email;  // Extract the actual email
+
+    console.log("Parsed email:", email);
+    console.log("Points to add:", pointsToAdd);
+
+    if (!email || !pointsToAdd) {
+      return res.status(400).json({ message: 'Invalid request. Email or points missing.' });
+    }
+
+    // Find the user by email (case-insensitive)
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+
+    if (!user) {
+      console.log("User not found");
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+ 
+
+    // Add new points to the current points
+    user.points += pointsToAdd;
+    await user.save();
+    console.log("Points added successfully");
+
+    res.json({ message: 'Points updated', points: user.points });
+  } catch (error) {
+    console.error("Error updating points:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
+
+
+
+app.get('/leaderboard', async (req, res) => {
+  try {
+    // Fetch users sorted by points in descending order
+    const users = await User.find().sort({ points: -1 }).limit(10); // Adjust the limit as needed
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+
 
 // Serve static files if needed
 app.use(express.static('public'));
